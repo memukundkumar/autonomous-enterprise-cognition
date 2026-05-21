@@ -1,58 +1,126 @@
-class DARELoop:
+import json
+from datetime import datetime
+
+class DARELoopWithAudit:
+
+    def __init__(self):
+        self.memory = []
+        self.audit_log = []
+
+        self.policies = {
+            "AUTO_EXECUTE_ALLOWED": ["low"],
+            "NEED_APPROVAL": ["medium"],
+            "FORCE_ESCALATION": ["high"]
+        }
 
     def detect(self, signal):
-        print(f"[DETECT] Signal received: {signal}")
-        return {"signal": signal, "risk": "medium"}
+        print(f"[DETECT] {signal}")
+        return {"signal": signal}
 
     def assess(self, context):
-        print("[ASSESS] Evaluating impact...")
+        risk = "low"
+
         if "failure" in context["signal"].lower():
-            context["risk"] = "high"
+            risk = "high"
         elif "delay" in context["signal"].lower():
-            context["risk"] = "medium"
+            risk = "medium"
+
+        context["risk"] = risk
+        return context
+
+    def govern(self, context):
+        risk = context["risk"]
+
+        if risk in self.policies["FORCE_ESCALATION"]:
+            context["governance"] = "ESCALATE_TO_HUMAN"
+        elif risk in self.policies["NEED_APPROVAL"]:
+            context["governance"] = "REQUEST_APPROVAL"
         else:
-            context["risk"] = "low"
+            context["governance"] = "AUTO_EXECUTE"
+
         return context
 
     def resolve(self, context):
-        print("[RESOLVE] Deciding action...")
+        action = context["governance"]
 
-        if context["risk"] == "high":
-            action = "ESCALATE_TO_HUMAN"
-        elif context["risk"] == "medium":
-            action = "AUTOMATED_RETRY"
+        if action == "ESCALATE_TO_HUMAN":
+            decision = "ESCALATED"
+        elif action == "REQUEST_APPROVAL":
+            decision = "WAITING_APPROVAL"
         else:
-            action = "NO_ACTION_REQUIRED"
+            decision = "EXECUTED_AUTONOMOUSLY"
 
-        context["action"] = action
+        context["decision"] = decision
         return context
 
     def explain(self, context):
-        print("[EXPLAIN] Generating reasoning trace...")
-        explanation = f"""
-Signal: {context['signal']}
-Risk Level: {context['risk']}
-Action Taken: {context['action']}
+        explanation = {
+            "signal": context["signal"],
+            "risk": context["risk"],
+            "governance": context["governance"],
+            "decision": context["decision"],
+            "reason": "Policy + risk evaluation + system rules"
+        }
 
-Reason:
-- Based on enterprise signal interpretation
-- Risk evaluated using heuristic rules
-- Governance constraints applied
-"""
-        context["explanation"] = explanation
-        return context
+        return explanation
+
+    # -------------------------
+    # 🧾 AUDIT SYSTEM
+    # -------------------------
+    def audit(self, context, explanation):
+
+        record = {
+            "timestamp": str(datetime.now()),
+            "context": context,
+            "explanation": explanation
+        }
+
+        self.audit_log.append(record)
+
+    # -------------------------
+    # 🔁 REPLAY SYSTEM
+    # -------------------------
+    def replay(self, index):
+        print("\n[REPLAY MODE]")
+
+        record = self.audit_log[index]
+
+        print(json.dumps(record, indent=2))
+
+    # -------------------------
+    # RUN ENGINE
+    # -------------------------
+    def run(self, signal):
+
+        context = self.detect(signal)
+        context = self.assess(context)
+        context = self.govern(context)
+        context = self.resolve(context)
+
+        explanation = self.explain(context)
+
+        self.audit(context, explanation)
+
+        return explanation
 
 
-# ---- Simulation ----
+# -------------------------
+# SIMULATION
+# -------------------------
 if __name__ == "__main__":
-    engine = DARELoop()
 
-    signal = "Data pipeline failure in Snowflake ingestion layer"
+    engine = DARELoopWithAudit()
 
-    context = engine.detect(signal)
-    context = engine.assess(context)
-    context = engine.resolve(context)
-    context = engine.explain(context)
+    signals = [
+        "Data pipeline failure in Snowflake ingestion layer",
+        "Minor delay in reporting dashboard",
+        "System running normally"
+    ]
 
-    print("\n===== FINAL OUTPUT =====")
-    print(context["explanation"])
+    for s in signals:
+        print("\n====================")
+        result = engine.run(s)
+        print(result)
+
+    # Replay first decision
+    engine.replay(0)
