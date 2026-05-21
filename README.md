@@ -1,6 +1,3 @@
-# autonomous-enterprise-cognition
-# Autonomous Enterprise Cognition (AEC)
-
 ## A Cognitive Infrastructure Framework for Enterprise AI Systems
 
 ---
